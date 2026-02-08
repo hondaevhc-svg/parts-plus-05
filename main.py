@@ -475,21 +475,34 @@ def parts_enquiry_tab():
             if results:
                 # Convert results to DataFrame for table view
                 res_data = []
-                for idx, r in enumerate(results):
-                    # Check for supersession
-                    sup_part = getattr(r, 'superseded_part', None)
-                    sup_pn = sup_part.part_number if sup_part else None
+                s_no_counter = 1
+                
+                def add_to_results(part_obj, is_superseded=False, parent_pn=None):
+                    nonlocal s_no_counter
+                    pn = part_obj.part_number
+                    
+                    # Avoid duplicates in the same search result view if possible
+                    # (Though get_parts_like already has seen_parts logic)
                     
                     res_data.append({
-                        'S.No': idx + 1,
-                        'Part Number': r.part_number,
-                        'Description': r.description,
-                        'Price': r.price,
-                        'Available_Qty': int(r.free_stock or 0),
-                        'Requested_Qty': 1 if int(r.free_stock or 0) > 0 else 0,
-                        'Supersedes': sup_pn,
+                        'S.No': s_no_counter,
+                        'Part Number': pn,
+                        'Description': part_obj.description,
+                        'Price': part_obj.price,
+                        'Available_Qty': int(getattr(part_obj, 'free_stock', 0) or 0),
+                        'Requested_Qty': 1 if int(getattr(part_obj, 'free_stock', 0) or 0) > 0 else 0,
+                        'Supersedes': parent_pn if is_superseded else getattr(part_obj, 'superseded_part', None).part_number if hasattr(part_obj, 'superseded_part') and part_obj.superseded_part else None,
                         'Select': False
                     })
+                    s_no_counter += 1
+                    
+                    # Recursively add superseded parts if they exist
+                    sup_part = getattr(part_obj, 'superseded_part', None)
+                    if sup_part:
+                        add_to_results(sup_part, is_superseded=True, parent_pn=pn)
+
+                for r in results:
+                    add_to_results(r)
                     
                 df_results = pd.DataFrame(res_data)
                 

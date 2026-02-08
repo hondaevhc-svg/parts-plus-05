@@ -148,8 +148,8 @@ def get_parts_like(prefix, stock_type, adjustment_percent=0):
                 free_stock = current_part_data.get('free_stock') or 0
                 sup = current_part_data.get('superseded')
                 
-                # Logic: If stock is 0 AND superseded exists
-                if (float(free_stock) <= 0) and sup and str(sup).strip():
+                # Logic: If superseded exists (Removed stock check: always show if exists)
+                if sup and str(sup).strip():
                     sup_clean = str(sup).strip()
                     # Query DB for this specific part
                     with engine.begin() as conn2:
@@ -480,9 +480,17 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
         stock['price'] = stock['price'].round(2)
     
     # Merge on Matches
-    merged = df.merge(stock, left_on="lookup_part_number", right_on="match_key", how="left")
+    # Use suffixes to avoid duplicate columns (like part_number) that cause confusion later
+    df = df.merge(stock, left_on="lookup_part_number", right_on="match_key", how="left", suffixes=('', '_stock'))
     
-    merged["available_qty"] = merged["free_stock"].fillna(0).astype(int)
+    # After merge, we might have 'part_number' from DF and 'part_number_stock' from stock.
+    # We want to use the 'part_number_stock' if available, otherwise fallback.
+    if 'part_number_stock' in df.columns:
+        df['real_part_number'] = df['part_number_stock'].combine_first(df['part_number'])
+    else:
+        df['real_part_number'] = df['part_number']
+
+    df["available_qty"] = df["free_stock"].fillna(0).astype(int)
     
     stock_unique = stock.drop_duplicates(subset=['part_number'])
     stock_unique_norm = stock.drop_duplicates(subset=['match_key'])
@@ -492,13 +500,14 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
     
     results_list = []
     
-    for idx, row in merged.iterrows():
+    for idx, row in df.iterrows():
         orig_pn = row['original_part_number']
         desc = row['description'] 
         avail = row['available_qty']
         price = row['price']
         req_qty = row['qty']
         sno = row[sno_col]
+        real_pn = row['real_part_number']
         
         if pd.isna(desc):
              results_list.append({
@@ -548,7 +557,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
                  'back_order': 0,
                  'no_record': False,
                  'status': "Fully Allocated",
-                 'allocated_part_number': row['part_number'],
+                 'allocated_part_number': real_pn,
                  'supersedes': sup_display
              })
              
@@ -577,7 +586,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
                      'back_order': 0,
                      'no_record': False,
                      'status': "Partial - Split",
-                     'allocated_part_number': row['part_number'],
+                     'allocated_part_number': real_pn,
                      'supersedes': sup_display
                  })
             else:
@@ -592,7 +601,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
                      'back_order': req_qty,
                      'no_record': False,
                      'status': "Out of Stock",
-                     'allocated_part_number': row['part_number'],
+                     'allocated_part_number': real_pn,
                      'supersedes': sup_display
                  })
 
@@ -627,7 +636,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
                  'back_order': remainder,
                  'no_record': False,
                  'status': "Partial" if alloc_orig > 0 else "Out of Stock",
-                 'allocated_part_number': row['part_number'],
+                 'allocated_part_number': real_pn,
                  'supersedes': sup_display
              })
 
