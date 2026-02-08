@@ -610,7 +610,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
             alloc_sup = min(remainder, sup_avail)
             
             results_list.append({
-                 'S.No': sno, # Same S.No to show it belongs to the same request
+                 'S.No': f"{sno}.1", # Suffixed S.No to show it belongs to the same request
                  'original_part_number': orig_pn,
                  'description': superseded_part_data['description'],
                  'price': sup_price,
@@ -644,7 +644,7 @@ def process_bulk_enquiry(df_bulk, stock_type, adjustment_percent=0):
     
     if not output_df.empty:
         # Re-sort to maintain original order
-        output_df = output_df.sort_values(by=['S.No', 'status'], ascending=[True, False])
+        output_df = output_df.sort_values(by=['S.No', 'status'], ascending=[True, False]).reset_index(drop=True)
 
         output_df['display_part_number'] = output_df['allocated_part_number'].combine_first(output_df['original_part_number'])
         

@@ -165,19 +165,13 @@ def show_cart_ui(user_id):
         if p['part_number'] in child_map:
             ordered_items.extend(child_map[p['part_number']])
             
-    # 4. Create DataFrame
+    # Create DataFrame
     df = pd.DataFrame(ordered_items)
-    
-    # 5. Add Columns for Display
-    if 'S.No' not in df.columns:
-        df.insert(0, 'S.No', range(1, len(df) + 1))
-    if 'Select' not in df.columns:
-        df.insert(0, 'Select', True)
     
     # Standardize column names for config
     df = df.rename(columns={
         'part_number': 'Part Number',
-        'requested_qty': 'Requested_Qty',
+        'qty': 'Requested_Qty',
         'description': 'Description',
         'price': 'Price',
         'available_qty': 'Available_Qty',
@@ -188,26 +182,15 @@ def show_cart_ui(user_id):
         'no_record': 'No Record'
     })
 
+    if 'S.No' not in df.columns:
+        df.insert(0, 'S.No', range(1, len(df) + 1))
+    if 'Select' not in df.columns:
+        df.insert(0, 'Select', True)
+
     # Columns to show
     cols = ['Select', 'S.No', 'Part Number', 'Description', 'Price', 'Available_Qty', 'Requested_Qty', 'Allocated_Qty', 'Back Order', 'Supersedes', 'Status', 'No Record', 'id']
     final_cols = [c for c in cols if c in df.columns]
     df = df[final_cols]
-    
-    # Configuration
-    column_config = {
-        "Select": st.column_config.CheckboxColumn("Select", default=True),
-        "S.No": st.column_config.NumberColumn("S.No", format="%d", width="small"),
-        "part_number": st.column_config.TextColumn("Part Number", disabled=True),
-        "description": st.column_config.TextColumn("Description", disabled=True),
-        "price": st.column_config.NumberColumn("Price", format="%.2f", disabled=True),
-        "requested_qty": st.column_config.NumberColumn("Qty (Req)", min_value=1, format="%d"),
-        "available_qty": st.column_config.NumberColumn("Stock", disabled=True, format="%d"),
-        "allocated_qty": st.column_config.NumberColumn("Allocated", disabled=True, format="%d"),
-        "status": st.column_config.TextColumn("Status", disabled=True),
-        "supersedes": st.column_config.TextColumn("Link Info", disabled=True, help="Shows if this part supersedes another"),
-        "no_record": st.column_config.CheckboxColumn("No Record", disabled=True),
-        "id": None # Hide ID
-    }
 
     edited_df = st.data_editor(
         df,
@@ -429,18 +412,18 @@ def display_order_history(user_id, key_prefix="default"):
 # Standard Table Configuration
 def get_standard_config():
     return {
-        "Select": st.column_config.CheckboxColumn("Select", default=False),
-        "S.No": st.column_config.NumberColumn("S.No", format="%d", width="small", disabled=True),
-        "Part Number": st.column_config.TextColumn("Part Number", disabled=True),
-        "Description": st.column_config.TextColumn("Description", disabled=True),
-        "Price": st.column_config.NumberColumn("Price", format="%.2f", disabled=True),
-        "Available_Qty": st.column_config.NumberColumn("Available Qty", disabled=True, format="%d"),
-        "Requested_Qty": st.column_config.NumberColumn("Required Qty", min_value=0, format="%d"),
-        "Allocated_Qty": st.column_config.NumberColumn("Allocated Qty", disabled=True, format="%d"),
-        "Back Order": st.column_config.NumberColumn("Back Order", disabled=True, format="%d"),
-        "Supersedes": st.column_config.TextColumn("Supersedes", disabled=True),
-        "Status": st.column_config.TextColumn("Status", disabled=True),
-        "No Record": st.column_config.CheckboxColumn("No Record", disabled=True),
+        "Select": st.column_config.CheckboxColumn("Select", default=False, width="small"),
+        "S.No": st.column_config.TextColumn("S.No", width="small", disabled=True),
+        "Part Number": st.column_config.TextColumn("Part Number", width="medium", disabled=True),
+        "Description": st.column_config.TextColumn("Description", width="medium", disabled=True),
+        "Price": st.column_config.NumberColumn("Price", format="%.2f", width="small", disabled=True),
+        "Available_Qty": st.column_config.NumberColumn("Available Qty", width="small", disabled=True, format="%d"),
+        "Requested_Qty": st.column_config.NumberColumn("Required Qty", width="small", min_value=0, format="%d"),
+        "Allocated_Qty": st.column_config.NumberColumn("Allocated Qty", width="small", disabled=True, format="%d"),
+        "Back Order": st.column_config.NumberColumn("Back Order", width="small", disabled=True, format="%d"),
+        "Supersedes": st.column_config.TextColumn("Supersedes", width="medium", disabled=True),
+        "Status": st.column_config.TextColumn("Status", width="medium", disabled=True),
+        "No Record": st.column_config.CheckboxColumn("No Record", width="small", disabled=True),
         "id": None,
         "real_part_number": None,
         "Requested Input": None,
@@ -598,27 +581,41 @@ def bulk_order_tab():
             # OR Update Config to handle 'Part Number'.
             # Better: Rename columns here to match Standard Config keys.
             
-            rename_map = {
-                'Part Number': 'part_number',
-                'Description': 'description',
-                'Price': 'price',
-                'Stock': 'available_qty',
-                'Allocated': 'allocated_qty',
-                'No Record': 'no_record',
-                'Status': 'status',
-                'Superseded By': 'supersedes' # If logic returned it
-            }
-            # Check what logic returned
-            # Logic output: Part Number, Description, Price, Stock, Allocated, No Record, Status, real_part_number, supersedes, qty
-            
-            bulk_df = bulk_df.rename(columns=rename_map)
+            # Ensure columns are present for config mapping
+            # logic.py returns capitalized headers.
             
             # Ensure Select
             if 'Select' not in bulk_df.columns:
                 bulk_df.insert(0, 'Select', True)
             
-            # Columns to Show
-            cols = ['Select', 'S.No', 'Part Number', 'Supersedes', 'Description', 'Price', 'Available_Qty', 'Requested_Qty', 'Allocated_Qty', 'Back Order', 'Status', 'No Record', 'real_part_number']
+            # Columns to Show (Streamlit data_editor shows columns in this order)
+            cols = ['Select', 'S.No', 'Part Number', 'Description', 'Price', 'Available_Qty', 'Requested_Qty', 'Allocated_Qty', 'Back Order', 'Supersedes', 'Status', 'No Record', 'real_part_number']
+            
+            # Ensure columns are present for config mapping
+            # logic.py returns capitalized headers: Part Number, Requested_Qty, etc.
+            
+            # Ensure Select
+            if 'Select' not in bulk_df.columns:
+                bulk_df.insert(0, 'Select', True)
+            
+            # Columns to Show (Streamlit data_editor shows columns in this order)
+            cols = ['Select', 'S.No', 'Part Number', 'Description', 'Price', 'Available_Qty', 'Requested_Qty', 'Allocated_Qty', 'Back Order', 'Supersedes', 'Status', 'No Record', 'real_part_number']
+            
+            # Ensure case-sensitive keys match what get_standard_config expects
+            expected_renames = {
+                'part_number': 'Part Number',
+                'description': 'Description',
+                'price': 'Price',
+                'available_qty': 'Available_Qty',
+                'requested_qty': 'Requested_Qty',
+                'allocated_qty': 'Allocated_Qty',
+                'back_order': 'Back Order',
+                'no_record': 'No Record',
+                'status': 'Status',
+                'supersedes': 'Supersedes'
+            }
+            bulk_df = bulk_df.rename(columns=lambda x: expected_renames.get(x.lower().replace(" ", "_"), x))
+
             final_cols = [c for c in cols if c in bulk_df.columns]
             bulk_df = bulk_df[final_cols]
             
